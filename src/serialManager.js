@@ -53,7 +53,6 @@ class SerialManager {
   async disconnect () {
     this.stopPolling()
     if (!this.port) return
-    // close 이벤트가 재연결 루프를 트리거하지 않도록 리스너 제거
     this.port.removeAllListeners('close')
     return new Promise((resolve) => {
       this.port.close(() => {
@@ -72,7 +71,6 @@ class SerialManager {
 
     this.stopPolling()
 
-    // 포트가 아직 열려있으면 닫기 (무응답 케이스)
     if (this.port && this.port.isOpen) {
       this.port.removeAllListeners('close')
       this.port.close(() => {})
@@ -80,7 +78,6 @@ class SerialManager {
     this.port   = null
     this.parser = null
 
-    // 대기 중인 프레임 요청 전부 즉시 실패 처리
     for (const { reject } of this._cmdQueue) reject(new Error('Disconnected'))
     this._cmdQueue   = []
     this._cmdRunning = false
@@ -165,8 +162,6 @@ class SerialManager {
     return crc
   }
 
-  // 프레임 구조
-  // [슬레이브주소][기능코드][데이터...][CRC16 (2바이트, little-endian)]
   _buildFrame (functionCode, address, registerData) {
     const buf = Buffer.alloc(6)
     buf[0] = this.slaveId
@@ -248,6 +243,28 @@ class SerialManager {
     this.pollInterval = null
   }
 
+  _isConnectivityError (err) {
+    return /Timeout|Disconnected|Reconnecting|Port not open/i.test(err.message)
+  }
+
+  async _waitForReconnect () {
+    while (this._reconnecting) await this._waitFor(500)
+  }
+
+  async _detectResumeStage (lastKnownStage) {
+    try {
+      const brwStage = (await this.readInputRegisters(0x0030, 1))[0]
+      this.log(`BRW_STAGE after reconnect: ${brwStage} (lastKnownStage=${lastKnownStage})`)
+      if (brwStage >= 7 && brwStage <= 11) return 2
+      if (brwStage >= 1 && brwStage <= 5)  return 1
+      if (lastKnownStage >= 1) return -1
+      return 0
+    } catch (_) {
+      this.log(`BRW_STAGE read failed after reconnect (lastKnownStage=${lastKnownStage})`)
+      return lastKnownStage
+    }
+  }
+
   addOrders (order) {
     for (let i = 0; i < (order.count || 1); i++) this.queue.push({ dose: order.dose, yield: order.yield })
     this.log(`Queue length: ${this.queue.length}`)
@@ -256,57 +273,79 @@ class SerialManager {
   async startQueue () {
     if (this.processing) return
     this.processing = true
+    let stage = 0
     while (this.queue.length > 0) {
-      const job = this.queue.shift()
+      const job = this.queue[0]
       try {
-        await this._processJob(job)
+        await this._processJob(job, stage)
+        this.queue.shift()
+        stage = 0
       } catch (error) {
-        this.log('Job error: ' + error)
+        if (this._isConnectivityError(error)) {
+          this.log('Job paused — waiting for reconnect...')
+          await this._waitForReconnect()
+          const nextStage = await this._detectResumeStage(stage)
+          if (nextStage === -1) {
+            this.log('Job completed during reconnect downtime')
+            this.queue.shift()
+            stage = 0
+          } else {
+            stage = nextStage
+            this.log(`Resuming job from stage ${stage}`)
+          }
+        } else {
+          this.queue.shift()
+          stage = 0
+          this.log('Job failed (non-connectivity): ' + error)
+        }
       }
     }
     this.processing = false
   }
 
-  async _processJob (job) {
-    this.log('Starting job ' + JSON.stringify(job))
-    const doseVal  = Math.round(job.dose * 10)
+  async _processJob (job, startStage = 0) {
+    this.log(`Starting job stage=${startStage} ` + JSON.stringify(job))
+    const doseVal  = Math.round(job.dose  * 10)
     const yieldVal = Math.round(job.yield * 10)
 
-    await this.writeSingleRegister(0x0120, doseVal)
-    await this.writeSingleRegister(0x0121, yieldVal)
+    if (startStage <= 0) {
+      await this.writeSingleRegister(0x0120, doseVal)
+      await this.writeSingleRegister(0x0121, yieldVal)
 
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const ready = (await this.readInputRegisters(0x0002, 1))[0]
-      if ((ready & 0x0001) === 1) break
-      await this._waitFor(200)
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const ready = (await this.readInputRegisters(0x0002, 1))[0]
+        if ((ready & 0x0001) === 1) break
+        await this._waitFor(200)
+      }
+
+      await this.writeSingleRegister(0x0001, 0)
+      await this.writeSingleRegister(0x0002, 0)
+      await this.writeSingleRegister(0x0000, 0x0005)
+
+      for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+          const hr0 = await this._readHolding(0x0000, 1)
+          if (hr0[0] === 0x0000) { this.log('Command accepted'); break }
+          if (hr0[0] === 0xFFFF) { this.log('Command rejected by device'); throw new Error('Command rejected') }
+        } catch (error) {
+          this.log('read holding error: ' + error)
+        }
+        await this._waitFor(200)
+      }
     }
 
-    await this.writeSingleRegister(0x0001, 0)
-    await this.writeSingleRegister(0x0002, 0)
-    await this.writeSingleRegister(0x0000, 0x0005)
-
-    for (let attempt = 0; attempt < 10; attempt++) {
-      try {
-        const hr0 = await this._readHolding(0x0000, 1)
-        if (hr0[0] === 0x0000) { this.log('Command accepted'); break }
-        if (hr0[0] === 0xFFFF) { this.log('Command rejected by device'); throw new Error('Command rejected') }
-      } catch (error) {
-        this.log('read holding error: ' + error)
+    if (startStage <= 1) {
+      for (let t = 0; t < 600; t++) {
+        const r = (await this.readInputRegisters(0x0090, 1))[0]
+        if (r === 2) break
+        await this._waitFor(200)
       }
-      await this._waitFor(200)
     }
 
     let completed = false
-    for (let t = 0; t < 600; t++) {
-      const r = (await this.readInputRegisters(0x0090, 1))[0]
-      if (r === 2) {
-        for (let k = 0; k < 200; k++) {
-          const cup = (await this.readInputRegisters(0x0003, 1))[0]
-          if (cup === 0x0000) { completed = true; break }
-          await this._waitFor(200)
-        }
-        break
-      }
+    for (let k = 0; k < 200; k++) {
+      const cup = (await this.readInputRegisters(0x0003, 1))[0]
+      if (cup === 0x0000) { completed = true; break }
       await this._waitFor(200)
     }
 

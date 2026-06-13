@@ -1,0 +1,19 @@
+{
+  "name": "my-electron-app",
+  "version": "1.0.0",
+  "description": "Hello World!",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Baggy",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^42.3.3"
+  },
+  "dependencies": {
+    "@serialport/parser-inter-byte-timeout": "^13.0.0",
+    "serialport": "^10.5.0"
+  }
+}

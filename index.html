@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>음료 머신 컨트롤러</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- Screen 1: 연결 스플래시                      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen active" id="screen-connect">
+    <div class="connect-card">
+      <div class="connect-logo">☕</div>
+      <h1 class="connect-title">음료 머신 컨트롤러</h1>
+      <div id="connect-status" class="connect-status">머신에 연결하는 중...</div>
+      <button id="retry-btn" class="btn-primary btn-large" style="display:none">다시 시도</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- Screen 2: 메뉴 선택 화면                    -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-menu">
+    <header class="status-bar">
+      <span class="status-chip" id="chip-temp">-- °C</span>
+      <span class="status-chip" id="chip-pressure">-- bar</span>
+      <span class="status-chip" id="chip-cup">컵 없음</span>
+      <span class="status-chip" id="chip-ready">대기중</span>
+      <button id="debug-btn" class="debug-icon" title="디버그">⚙</button>
+    </header>
+
+    <main class="menu-body">
+      <h2 class="menu-heading">음료를 선택하세요</h2>
+
+      <div class="recipe-grid">
+        <button class="recipe-card" data-recipe="espresso">
+          <span class="recipe-icon">☕</span>
+          <span class="recipe-name">에스프레소</span>
+          <span class="recipe-sub">원두 15g / 추출 30ml</span>
+        </button>
+        <div class="recipe-card sold-out">
+          <span class="recipe-icon">🧋</span>
+          <span class="recipe-name">아메리카노</span>
+          <span class="recipe-sub">준비 예정</span>
+          <div class="sold-out-badge">✕ SOLD OUT</div>
+        </div>
+        <div class="recipe-card sold-out">
+          <span class="recipe-icon">🥛</span>
+          <span class="recipe-name">카페라떼</span>
+          <span class="recipe-sub">준비 예정</span>
+          <div class="sold-out-badge">✕ SOLD OUT</div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="menu-footer">
+      <span id="footer-queue">대기 중인 주문이 없습니다</span>
+      <button id="go-brewing-btn" class="btn-ghost" style="display:none">제조 현황 보기 →</button>
+    </footer>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 모달: 주문 팝업 (메뉴 화면 위에 오버레이)   -->
+  <!-- ══════════════════════════════════════════ -->
+  <div id="order-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-recipe-icon">☕</div>
+      <p id="modal-recipe-name" class="modal-name">에스프레소</p>
+      <p id="modal-recipe-detail" class="modal-detail">원두 15g / 추출 30ml</p>
+
+      <div class="modal-count-row">
+        <button id="modal-count-dec" class="count-btn">−</button>
+        <span id="modal-count-display">1</span>
+        <button id="modal-count-inc" class="count-btn">+</button>
+      </div>
+
+      <div class="modal-actions">
+        <button id="modal-cancel-btn" class="btn-ghost btn-large">취소</button>
+        <button id="modal-ok-btn" class="btn-primary btn-large">주문하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- Screen 4: 제조 화면                         -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-brewing">
+    <header class="status-bar">
+      <span class="status-chip" id="brew-chip-temp">-- °C</span>
+      <span class="status-chip" id="brew-chip-pressure">-- bar</span>
+      <span class="status-chip" id="brew-chip-cup">컵 없음</span>
+    </header>
+
+    <div class="brewing-layout">
+
+      <!-- 좌측: 현재 제조 진행 -->
+      <section class="brewing-main">
+        <p class="brewing-label">현재 제조중</p>
+        <p id="brewing-recipe-name" class="brewing-recipe">Regular</p>
+
+        <div class="stage-track">
+          <div class="stage-bubble" data-stage="0"><span>그라인딩</span></div>
+          <div class="stage-connector"></div>
+          <div class="stage-bubble" data-stage="1"><span>탬핑</span></div>
+          <div class="stage-connector"></div>
+          <div class="stage-bubble" data-stage="2"><span>추출</span></div>
+          <div class="stage-connector"></div>
+          <div class="stage-bubble" data-stage="3"><span>마무리</span></div>
+          <div class="stage-connector"></div>
+          <div class="stage-bubble" data-stage="4"><span>복귀</span></div>
+        </div>
+
+        <p id="brewing-stage-msg" class="brewing-stage-msg">—</p>
+
+        <div class="brewing-metrics">
+          <div class="metric">
+            <label>온도</label>
+            <span id="brewing-temp">--</span>
+            <small>°C</small>
+          </div>
+          <div class="metric">
+            <label>압력</label>
+            <span id="brewing-pressure">--</span>
+            <small>bar</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- 우측: 대기열 -->
+      <aside class="brewing-queue">
+        <p class="queue-title">대기열</p>
+        <ol id="queue-list" class="queue-ol"></ol>
+        <div class="queue-empty" id="queue-empty-msg">대기 없음</div>
+        <button id="add-order-btn" class="btn-ghost btn-block">+ 추가 주문</button>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- Screen 5: 완료 화면                         -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-done">
+    <div class="done-card">
+      <div class="done-icon">✓</div>
+      <h2 class="done-title">제조 완료!</h2>
+      <p class="done-sub">컵을 가져가세요</p>
+      <p id="done-recipe-text" class="done-recipe">Regular 에스프레소</p>
+      <div id="done-countdown" class="done-countdown">3초 후 처음으로 돌아갑니다</div>
+      <button id="done-home-btn" class="btn-primary btn-large">처음으로</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- Screen 6: 디버그 화면                       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-debug">
+    <div class="debug-header">
+      <button id="debug-back-btn" class="btn-ghost">← 돌아가기</button>
+      <h2>디버그</h2>
+      <button id="disconnect-btn" class="btn-ghost btn-warn">연결 해제</button>
+    </div>
+
+    <div class="debug-body">
+      <section class="debug-section">
+        <h3>머신 상태</h3>
+        <ul class="debug-list">
+          <li>보일러 온도: <strong id="boiler-temp">-</strong> °C</li>
+          <li>압력: <strong id="pressure">-</strong> bar</li>
+          <li>컵 상태: <strong id="cup-status">-</strong></li>
+          <li>시스템 모드: <strong id="sys-mode">-</strong></li>
+          <li>진행 단계: <strong id="brw-stage">-</strong></li>
+          <li>제조 상태: <strong id="rcp-state">-</strong></li>
+          <li>CMD_READY: <strong id="cmd-ready-val">-</strong></li>
+        </ul>
+      </section>
+
+      <section class="debug-section">
+        <h3>연결 설정</h3>
+        <label>포트: <input id="port-input" value="COM7"></label>
+        <label>보드레이트: <input id="baud-input" value="115200"></label>
+        <button id="reconnect-btn">재연결</button>
+      </section>
+
+      <section class="debug-section">
+        <h3>수동 주문</h3>
+        <label>도징(g): <input id="dose" value="15"></label>
+        <label>추출(ml): <input id="yield-ml" value="30"></label>
+        <label>수량: <input id="manual-count" value="1"></label>
+        <button id="add-order-debug">주문 추가</button>
+        <button id="start-queue-debug">큐 시작</button>
+      </section>
+
+      <section class="debug-section">
+        <h3>로그</h3>
+        <pre id="log-output"></pre>
+      </section>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

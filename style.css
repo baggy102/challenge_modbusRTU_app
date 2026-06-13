@@ -1,0 +1,660 @@
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --accent: #e94560;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --text: #eaeaea;
+  --text-dim: #888;
+  --radius: 14px;
+  --status-h: 52px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Screen 시스템 ─── */
+.screen {
+  display: none;
+  width: 100%;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ─── 공통: 상태 바 ─── */
+.status-bar {
+  height: var(--status-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid #ffffff12;
+  flex-shrink: 0;
+}
+
+.status-chip {
+  padding: 5px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface2);
+  color: var(--text-dim);
+  transition: background 0.2s, color 0.2s;
+}
+
+.status-chip.ok   { background: var(--green);  color: #000; }
+.status-chip.warn { background: var(--yellow); color: #000; }
+.status-chip.error{ background: var(--accent); color: #fff; }
+
+.debug-icon {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.debug-icon:hover { color: var(--text); }
+
+/* ─── 공통: 버튼 ─── */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  border: 2px solid var(--surface2);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 20px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-ghost:hover { border-color: var(--text-dim); color: var(--text); }
+.btn-ghost.btn-warn { border-color: var(--accent); color: var(--accent); }
+
+.btn-large { padding: 16px 40px; font-size: 20px; }
+.btn-block  { width: 100%; margin-top: 12px; }
+
+/* ══════════════════════════════════════════
+   Screen 1: 연결 화면
+══════════════════════════════════════════ */
+#screen-connect {
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.connect-card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 52px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  min-width: 380px;
+}
+
+.connect-logo {
+  font-size: 64px;
+  line-height: 1;
+}
+
+.connect-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.connect-status {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ══════════════════════════════════════════
+   Screen 2: 메뉴 선택 화면
+══════════════════════════════════════════ */
+#screen-menu {
+  background: var(--bg);
+}
+
+.menu-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 32px 40px;
+}
+
+.menu-heading {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
+  max-width: 680px;
+}
+
+.recipe-card {
+  min-height: 160px;
+  border-radius: 20px;
+  border: 3px solid transparent;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.recipe-card:hover { background: var(--surface2); }
+
+.recipe-card.selected {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+
+.recipe-icon { font-size: 32px; }
+.recipe-name { font-size: 22px; font-weight: 700; }
+.recipe-sub  { font-size: 12px; color: var(--text-dim); }
+
+/* sold-out 카드 */
+.recipe-card.sold-out {
+  opacity: 0.45;
+  cursor: not-allowed;
+  position: relative;
+  pointer-events: none;
+}
+
+.sold-out-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+}
+
+/* ── 주문 모달 ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 380px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+
+.modal-recipe-icon { font-size: 64px; }
+.modal-name   { font-size: 30px; font-weight: 700; }
+.modal-detail { font-size: 14px; color: var(--text-dim); }
+
+.modal-count-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 8px 0;
+}
+
+#modal-count-display {
+  font-size: 56px;
+  font-weight: 700;
+  min-width: 64px;
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.modal-actions .btn-ghost,
+.modal-actions .btn-primary {
+  flex: 1;
+}
+
+.count-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 32px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.count-btn:hover { background: var(--accent); }
+
+#count-display {
+  font-size: 60px;
+  font-weight: 700;
+  min-width: 72px;
+  text-align: center;
+}
+
+.menu-footer {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-top: 1px solid #ffffff12;
+  font-size: 14px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════
+   Screen 3: 주문 확인 화면
+══════════════════════════════════════════ */
+#screen-confirm {
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.confirm-card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 52px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 400px;
+  text-align: center;
+}
+
+.confirm-title {
+  font-size: 18px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.confirm-recipe-icon { font-size: 72px; }
+
+.confirm-name {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.confirm-detail {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.confirm-count {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+/* ══════════════════════════════════════════
+   Screen 4: 제조 화면
+══════════════════════════════════════════ */
+#screen-brewing {
+  background: var(--bg);
+}
+
+.brewing-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 좌측: 제조 진행 */
+.brewing-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px;
+}
+
+.brewing-label {
+  font-size: 14px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.brewing-recipe {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.stage-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  max-width: 560px;
+}
+
+.stage-bubble {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.stage-bubble span { padding: 0 4px; line-height: 1.3; }
+
+.stage-bubble.active {
+  background: var(--accent);
+  box-shadow: 0 0 24px var(--accent);
+  color: #fff;
+}
+
+.stage-bubble.done {
+  background: var(--green);
+  color: #000;
+}
+
+.stage-connector {
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  transition: background 0.3s;
+}
+
+.stage-connector.done { background: var(--green); }
+
+.brewing-stage-msg {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-dim);
+  min-height: 28px;
+}
+
+.brewing-metrics {
+  display: flex;
+  gap: 48px;
+}
+
+.metric { text-align: center; }
+.metric label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+.metric span  { font-size: 44px; font-weight: 700; }
+.metric small { font-size: 16px; color: var(--text-dim); margin-left: 4px; }
+
+/* 우측: 대기열 */
+.brewing-queue {
+  width: 240px;
+  background: var(--surface);
+  border-left: 1px solid #ffffff10;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  flex-shrink: 0;
+}
+
+.queue-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+
+.queue-ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.queue-ol li {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.queue-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ══════════════════════════════════════════
+   Screen 5: 완료 화면
+══════════════════════════════════════════ */
+#screen-done {
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.done-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.done-icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #000;
+  font-size: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.done-title {
+  font-size: 48px;
+  font-weight: 700;
+}
+
+.done-sub {
+  font-size: 20px;
+  color: var(--text-dim);
+}
+
+.done-recipe {
+  font-size: 18px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.done-countdown {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════
+   Screen 6: 디버그 화면
+══════════════════════════════════════════ */
+#screen-debug {
+  background: var(--bg);
+}
+
+.debug-header {
+  height: var(--status-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid #ffffff12;
+  flex-shrink: 0;
+}
+
+.debug-header h2 {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.debug-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.debug-section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debug-section h3 {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.debug-list {
+  list-style: none;
+  font-size: 13px;
+  line-height: 2;
+}
+
+.debug-section label {
+  font-size: 13px;
+  margin-right: 6px;
+}
+
+.debug-section input {
+  background: var(--bg);
+  border: 1px solid var(--surface2);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 110px;
+  margin-right: 8px;
+}
+
+.debug-section button {
+  padding: 5px 14px;
+  background: var(--surface2);
+  border: none;
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+#log-output {
+  height: 200px;
+  overflow: auto;
+  background: #0a0a12;
+  color: #4eff91;
+  padding: 8px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+  font-family: 'Consolas', monospace;
+}

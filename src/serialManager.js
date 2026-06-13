@@ -14,6 +14,9 @@ class SerialManager {
 
     this._cmdQueue   = []
     this._cmdRunning = false
+    this._portName   = null
+    this._baudRate   = 115200
+    this._reconnecting = false
   }
 
   log (message) {
@@ -27,12 +30,19 @@ class SerialManager {
   async connect (portName, baudRate = 115200) {
     if (this.port && this.port.isOpen) await this.disconnect()
 
+    this._portName = portName
+    this._baudRate = baudRate
+
     this.port   = new SerialPort({ path: portName, baudRate: Number(baudRate), autoOpen: false })
     this.parser = this.port.pipe(new InterByteTimeoutParser({ interval: 30 }))
 
     return new Promise((resolve, reject) => {
       this.port.open((error) => {
         if (error) return reject(error)
+
+        this.port.on('close', () => this._onPortClose())
+        this.port.on('error', (error) => this.log('Port error: ' + error))
+
         this.startPolling()
         this.log(`Opened ${portName}@${baudRate}`)
         resolve()
@@ -43,6 +53,8 @@ class SerialManager {
   async disconnect () {
     this.stopPolling()
     if (!this.port) return
+    // close 이벤트가 재연결 루프를 트리거하지 않도록 리스너 제거
+    this.port.removeAllListeners('close')
     return new Promise((resolve) => {
       this.port.close(() => {
         this.log('Port closed')
@@ -53,15 +65,57 @@ class SerialManager {
     })
   }
 
+  _onPortClose () {
+    if (this._reconnecting) return
+    this._reconnecting = true
+    this.log('Connection lost. Attempting to reconnect...')
+
+    this.stopPolling()
+
+    // 포트가 아직 열려있으면 닫기 (무응답 케이스)
+    if (this.port && this.port.isOpen) {
+      this.port.removeAllListeners('close')
+      this.port.close(() => {})
+    }
+    this.port   = null
+    this.parser = null
+
+    // 대기 중인 프레임 요청 전부 즉시 실패 처리
+    for (const { reject } of this._cmdQueue) reject(new Error('Disconnected'))
+    this._cmdQueue   = []
+    this._cmdRunning = false
+
+    this._reconnectLoop()
+  }
+
+  async _reconnectLoop () {
+    for (let attempt = 1; ; attempt++) {
+      this.log(`Reconnect attempt ${attempt}...`)
+      await this._waitFor(2000)
+      try {
+        await this.connect(this._portName, this._baudRate)
+        this.log('Reconnected successfully')
+        this._reconnecting = false
+        return
+      } catch (error) {
+        this.log(`Reconnect ${attempt} failed: ${error.message}`)
+      }
+    }
+  }
+
   _writeAndRead (frame, timeout = 1000) {
     return new Promise((resolve, reject) => {
+      if (this._reconnecting) {
+        reject(new Error('Reconnecting'))
+        return
+      }
       this._cmdQueue.push({ frame, timeout, resolve, reject })
       this._runNext()
     })
   }
 
   _runNext () {
-    if (this._cmdRunning || this._cmdQueue.length === 0) return
+    if (this._cmdRunning || this._cmdQueue.length === 0 || this._reconnecting) return
     this._cmdRunning = true
 
     const { frame, timeout, resolve, reject } = this._cmdQueue.shift()
@@ -83,8 +137,9 @@ class SerialManager {
     const timer = setTimeout(() => {
       this.parser.removeListener('data', onData)
       this._cmdRunning = false
+      this.log('Timeout - triggering reconnect')
       reject(new Error('Timeout'))
-      this._runNext()
+      this._onPortClose()
     }, timeout)
 
     this.parser.once('data', onData)

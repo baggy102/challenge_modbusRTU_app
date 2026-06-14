@@ -5,12 +5,14 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx electron-builder --win"
   },
   "author": "Baggy",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^42.3.3"
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "@serialport/parser-inter-byte-timeout": "^13.0.0",
